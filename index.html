@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>淘汰郎 - 終極流暢版</title>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
+      crossorigin="anonymous"
+    ></script>
+
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background-color: #1a1a1a;
+        font-family: "Microsoft JhengHei", sans-serif;
+      }
+      .container {
+        width: 100vw;
+        max-width: 450px;
+        aspect-ratio: 9 / 16;
+        background-image: url("淘汰郎.png");
+        background-size: cover;
+        background-position: center;
+        position: relative;
+        overflow: hidden;
+      }
+      #input_video {
+        display: none;
+      }
+
+      /* 卡片基本樣式 */
+      .single-card-container {
+        position: absolute;
+        width: 95%;
+        height: 80%;
+        top: 55%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 10;
+        background-color: transparent;
+        background-size: contain;
+        background-position: center;
+        background-repeat: no-repeat;
+        opacity: 0;
+        visibility: hidden;
+        transition:
+          transform 0.5s ease,
+          opacity 0.5s ease;
+      }
+
+      /* 普通模式卡片顯示 */
+      .card-active {
+        opacity: 1 !important;
+        visibility: visible !important;
+      }
+
+      /* --- Boss 模式卡片：更大且下移 --- */
+      .boss-card-active {
+        width: 180% !important;
+        height: 100% !important;
+        top: 60% !important;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        opacity: 1 !important;
+        visibility: visible !important;
+        z-index: 10;
+        background-color: transparent;
+        background-size: contain;
+        background-position: center;
+        background-repeat: no-repeat;
+        transition:
+          width 0.5s ease,
+          top 0.5s ease,
+          opacity 0.5s ease;
+      }
+
+      /* 飛離動畫 */
+      .swipe-left {
+        transform: translate(-200%, -150%) rotate(-60deg);
+        opacity: 0;
+      }
+      .swipe-right {
+        transform: translate(100%, -150%) rotate(60deg);
+        opacity: 0;
+      }
+
+      /* 畫面震動 */
+      .shake {
+        animation: shake-effect 0.15s infinite;
+      }
+      @keyframes shake-effect {
+        0% {
+          transform: translate(0, 0);
+        }
+        25% {
+          transform: translate(7px, 7px);
+        }
+        50% {
+          transform: translate(-7px, -7px);
+        }
+        75% {
+          transform: translate(7px, -7px);
+        }
+        100% {
+          transform: translate(0, 0);
+        }
+      }
+
+      /* --- 打擊特效：整體閃紅 --- */
+      .flash {
+        animation: flash-red 0.25s ease-out;
+      }
+      @keyframes flash-red {
+        0% {
+          filter: brightness(1) saturate(1);
+        }
+        50% {
+          filter: brightness(1.2) sepia(1) saturate(10) hue-rotate(-50deg)
+            drop-shadow(0 0 20px red);
+        }
+        100% {
+          filter: brightness(1) saturate(1);
+        }
+      }
+
+      /* 表情粒子 */
+      .particle {
+        position: absolute;
+        bottom: -80px;
+        pointer-events: none;
+        z-index: 100;
+        animation: particle-up 3.5s forwards ease-out;
+      }
+      @keyframes particle-up {
+        0% {
+          transform: translateY(0) rotate(0deg);
+          opacity: 1;
+        }
+        100% {
+          transform: translateY(-1000px) rotate(360deg);
+          opacity: 0;
+        }
+      }
+
+      /* Boss UI */
+      #boss-ui {
+        position: absolute;
+        bottom: 40px;
+        width: 85%;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 120;
+        display: none;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .hp-label {
+        color: #000;
+        font-size: 22px;
+        font-weight: 900;
+        margin-bottom: 5px;
+        text-shadow: 1px 1px 0px rgba(255, 255, 255, 0.5);
+      }
+      .hp-bar-bg {
+        width: 100%;
+        height: 25px;
+        background: #222;
+        border: 3px solid #000;
+        border-radius: 5px;
+        box-shadow: inset 0 0 10px #000;
+        overflow: hidden;
+      }
+      .hp-bar-fill {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(180deg, #ff4d4d 0%, #b30000 100%);
+        transition: width 0.2s;
+      }
+
+      .random-dialog {
+        position: absolute;
+        width: 220px;
+        z-index: 130;
+        pointer-events: none;
+        animation: pop-in 0.3s ease-out;
+      }
+      @keyframes pop-in {
+        0% {
+          transform: scale(0);
+          opacity: 0;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+
+      /* 下方滑桿 */
+      .footer-controls {
+        position: absolute;
+        bottom: 30px;
+        width: 90%;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 110;
+      }
+      .slider-wrapper {
+        position: relative;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .slider-bg {
+        width: 100%;
+      }
+      .slider-thumb {
+        position: absolute;
+        width: 28%;
+        left: 50%;
+        transform: translateX(-50%);
+        transition: left 0.2s ease-out;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container" id="gameContainer">
+      <video id="input_video"></video>
+      <div class="single-card-container" id="characterCard"></div>
+
+      <div id="boss-ui">
+        <div class="hp-label">HP:</div>
+        <div class="hp-bar-bg">
+          <div id="hp-fill" class="hp-bar-fill"></div>
+        </div>
+      </div>
+
+      <div class="footer-controls" id="normal-ui">
+        <div class="slider-wrapper">
+          <img src="滑桿.png" class="slider-bg" />
+          <img src="圓圈.png" id="circle" class="slider-thumb" />
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const characters = [
+        "人物1.png",
+        "人物2.png",
+        "人物3.png",
+        "人物4.png",
+        "人物5.png",
+      ];
+      const dialogs = ["對話框1.png", "對話框2.png", "對話框3.png"];
+      let currentCharacterIndex = 0;
+      let isBossMode = false;
+      let bossHP = 100;
+
+      const characterCard = document.getElementById("characterCard");
+      const gameContainer = document.getElementById("gameContainer");
+      const circle = document.getElementById("circle");
+      const hpFill = document.getElementById("hp-fill");
+      const bossUI = document.getElementById("boss-ui");
+      const normalUI = document.getElementById("normal-ui");
+
+      const soundLeft = new Audio("dislike.mp3");
+      const soundRight = new Audio("like.mp3");
+      const bgm = new Audio("bgm.mp3");
+      const bossBgm = new Audio("boss_bgm.mp3");
+      bgm.loop = true;
+      bgm.volume = 0.3;
+      bossBgm.loop = true;
+      bossBgm.volume = 0.5;
+      let isBgmPlaying = false;
+
+      let isSwiping = false;
+      let lastSwipeTime = 0;
+      const COOLDOWN_TIME = 3000;
+      let stayAtEdgeTime = 0;
+      const TRIGGER_THRESHOLD = 300;
+      let punchCooldown = false;
+
+      function createParticles(type) {
+        const imgSrc = type === "left" ? "哭臉.png" : "笑臉.png";
+        for (let i = 0; i < 10; i++) {
+          const img = document.createElement("img");
+          img.src = imgSrc;
+          img.className = "particle";
+          img.style.left = `${Math.random() * 100}%`;
+          img.style.animationDelay = `${Math.random() * 1.2}s`;
+          img.style.width = `${40 + Math.random() * 40}px`;
+          gameContainer.appendChild(img);
+          setTimeout(() => img.remove(), 5000);
+        }
+      }
+
+      function startBossMode() {
+        isBossMode = true;
+        bgm.pause();
+        bossBgm.play().catch(() => {});
+        gameContainer.classList.add("shake");
+        setTimeout(() => gameContainer.classList.remove("shake"), 1500);
+
+        // 先移除舊狀態並立即換圖，防止人物5殘留
+        characterCard.classList.remove("card-active");
+        characterCard.style.opacity = "0";
+        characterCard.style.backgroundImage = "url('boss.png')";
+
+        setTimeout(() => {
+          characterCard.classList.add("boss-card-active");
+          normalUI.style.display = "none";
+          bossUI.style.display = "flex";
+        }, 100);
+      }
+
+      function punchBoss() {
+        if (!isBossMode || bossHP <= 0 || punchCooldown) return;
+        bossHP -= 5;
+        hpFill.style.width = bossHP + "%";
+
+        // 彈出對話框
+        const dialog = document.createElement("img");
+        dialog.src = dialogs[Math.floor(Math.random() * dialogs.length)];
+        dialog.className = "random-dialog";
+        dialog.style.top = `${10 + Math.random() * 35}%`;
+        dialog.style.left = `${10 + Math.random() * 30}%`;
+        gameContainer.appendChild(dialog);
+        setTimeout(() => {
+          dialog.style.opacity = "0";
+          setTimeout(() => dialog.remove(), 500);
+        }, 2000);
+
+        // 閃紅與震動
+        characterCard.classList.add("flash");
+        setTimeout(() => characterCard.classList.remove("flash"), 250);
+        gameContainer.classList.add("shake");
+        setTimeout(() => gameContainer.classList.remove("shake"), 100);
+
+        punchCooldown = true;
+        setTimeout(() => (punchCooldown = false), 250);
+
+        if (bossHP <= 0) {
+          alert("恭喜！BOSS 已被徹底淘汰！");
+          location.reload();
+        }
+      }
+
+      function showCharacterById(index) {
+        if (index >= characters.length) {
+          startBossMode();
+          return;
+        }
+        // 先換圖，再給一點點延遲才顯示，避免閃現前一張
+        characterCard.style.backgroundImage = `url('${characters[index]}')`;
+        setTimeout(() => {
+          characterCard.classList.add("card-active");
+        }, 50);
+      }
+
+      function swipe(direction) {
+        const now = Date.now();
+        if (isSwiping || now - lastSwipeTime < COOLDOWN_TIME || isBossMode)
+          return;
+        isSwiping = true;
+        lastSwipeTime = now;
+        circle.style.left = "50%";
+        createParticles(direction);
+
+        if (direction === "left") soundLeft.play().catch(() => {});
+        else soundRight.play().catch(() => {});
+
+        characterCard.classList.add(
+          direction === "left" ? "swipe-left" : "swipe-right",
+        );
+
+        setTimeout(() => {
+          // 徹底移除狀態與透明度
+          characterCard.classList.remove(
+            "card-active",
+            "swipe-left",
+            "swipe-right",
+          );
+          characterCard.style.opacity = "0";
+
+          setTimeout(() => {
+            currentCharacterIndex++;
+            showCharacterById(currentCharacterIndex);
+            isSwiping = false;
+          }, 150); // 增加切換緩衝，消除閃現
+        }, 500);
+      }
+
+      const hands = new Hands({
+        locateFile: (file) =>
+          `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+      });
+      hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+      hands.onResults((results) => {
+        const now = Date.now();
+        if (!isBgmPlaying && results.multiHandLandmarks?.length > 0) {
+          bgm
+            .play()
+            .then(() => (isBgmPlaying = true))
+            .catch(() => {});
+        }
+        if (results.multiHandLandmarks?.length > 0) {
+          const landmark = results.multiHandLandmarks[0][9];
+          if (!isBossMode) {
+            if (now - lastSwipeTime < COOLDOWN_TIME) {
+              circle.style.left = "50%";
+              return;
+            }
+            let xPos = (1 - landmark.x) * 100;
+            xPos = Math.max(20, Math.min(80, xPos));
+            circle.style.left = `${xPos}%`;
+            if (xPos <= 25 || xPos >= 75) {
+              if (stayAtEdgeTime === 0) stayAtEdgeTime = now;
+              if (now - stayAtEdgeTime > TRIGGER_THRESHOLD)
+                swipe(xPos <= 25 ? "left" : "right");
+            } else {
+              stayAtEdgeTime = 0;
+            }
+          } else {
+            if (landmark.z < -0.15) punchBoss();
+          }
+        }
+      });
+
+      const camera = new Camera(document.getElementById("input_video"), {
+        onFrame: async () => {
+          await hands.send({ image: document.getElementById("input_video") });
+        },
+        width: 640,
+        height: 480,
+      });
+      camera.start();
+      showCharacterById(currentCharacterIndex);
+    </script>
+  </body>
+</html>
